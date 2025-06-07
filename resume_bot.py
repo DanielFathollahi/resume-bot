@@ -16,7 +16,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
     if data == 'resume':
-        await query.edit_message_text("شناگر حرفه‌ای و بازیکن حرفه‌ای واترپلو
+        resume_text = """شناگر حرفه‌ای و بازیکن حرفه‌ای واترپلو
 
 برنامه‌نویسی و توسعه اپلیکیشن‌های اندروید
 
@@ -50,7 +50,9 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 تبدیل شدن به یک میلیاردر و موفق در زمینه تجارت و فناوری
 
-ادامه تحصیل در رشته علوم کامپیوتر یا مهندسی نرم‌افزار")
+ادامه تحصیل در رشته علوم کامپیوتر یا مهندسی نرم‌افزار
+"""
+        await query.edit_message_text(resume_text)
     elif data == 'projects':
         await query.edit_message_text("🔹 این پروژه‌هام هستن: ...")
 
