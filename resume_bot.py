@@ -1,8 +1,10 @@
+import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 
 TOKEN = "7403835902:AAG-6KAhT3fP1XNlUjHQs_TVGSl3EPwu_1g"
 
+# پیام شروع بات
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("📄 رزومه", callback_data='resume')],
@@ -11,52 +13,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("یکی از گزینه‌های زیر را انتخاب کن:", reply_markup=reply_markup)
 
+# کنترل دکمه‌ها
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
     if data == 'resume':
-        resume_text = """شناگر حرفه‌ای و بازیکن حرفه‌ای واترپلو
+        resume_text = """✅ رزومه من:
 
-برنامه‌نویسی و توسعه اپلیکیشن‌های اندروید
-
-آشنایی با نرم‌افزار Unity و توسعه بازی‌های موبایل
-
-طراحی و برنامه‌نویسی بازی‌های کلمات و پازل
-
-توانایی کار با نرم‌افزارهای آفیس (Word, Excel, PowerPoint)
-
-علاقه‌مند به یادگیری مباحث هوش مصنوعی و توسعه نرم‌افزار
-
-آشنایی با اصول و تکنیک‌های تحلیل و ساخت بازی‌های کامپیوتری
-
-توانایی مدیریت پروژه‌های کوچک برنامه‌نویسی و طراحی بازی
-
-مسلط به زبان فارسی و دارای توانایی پایه در زبان انگلیسی
-
-تجربه‌ها:
-
-ساخت بازی کلمه‌ای در Unity
-
-برنامه‌نویسی اپلیکیشن‌های اندروید و انتشار آن‌ها در گوگل پلی
-
-شرکت در مسابقات شنای حرفه‌ای و واترپلو
-
-همکاری در پروژه‌های کوچک نرم‌افزاری و طراحی بازی
-
-اهداف و علاقه‌مندی‌ها:
-
-توسعه مهارت‌های برنامه‌نویسی و طراحی بازی
-
-تبدیل شدن به یک میلیاردر و موفق در زمینه تجارت و فناوری
-
-ادامه تحصیل در رشته علوم کامپیوتر یا مهندسی نرم‌افزار
+🏊‍♂️ شناگر حرفه‌ای و بازیکن حرفه‌ای واترپلو  
+📱 توسعه‌دهنده اپلیکیشن‌های اندروید  
+🎮 توسعه‌دهنده بازی با Unity  
+🧩 ساخت بازی‌های کلمه‌ای  
+💼 آشنا با Word, Excel, PowerPoint  
+🤖 علاقه‌مند به هوش مصنوعی و برنامه‌نویسی  
+🎯 هدف: میلیاردر شدن در زمینه فناوری و تجارت
 """
         await query.edit_message_text(resume_text)
     elif data == 'projects':
-        await query.edit_message_text("🔹 این پروژه‌هام هستن: ...")
+        await query.edit_message_text("🔹 این پروژه‌هام هستن:\n1. بازی Amirza-like\n2. اپلیکیشن پرداخت 'صندوق'\n3. ربات تلگرام رزومه\n4. بازی Wall Ball در Unity")
 
+# ساخت اپ و فعال‌سازی وب‌هوک
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(button_click))
-app.run_polling()
+
+# اجرا به صورت webhook برای Render
+app.run_webhook(
+    listen="0.0.0.0",
+    port=int(os.environ.get('PORT', 5000)),
+    webhook_url="https://resume-bot-1w9j.onrender.com"
+)
