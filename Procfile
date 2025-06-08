@@ -1,1 +1,1 @@
-web: python resume_bot.py
+worker: python resume_bot.py
