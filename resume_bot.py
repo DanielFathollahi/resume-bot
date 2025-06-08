@@ -4,8 +4,21 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 
 TOKEN = os.environ["TOKEN"]
 PDF_PATH = "resume.pdf"
+ADMIN_CHAT_ID = 6441736006  # آیدی عددی شما
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+
+    # ارسال مشخصات کاربر برای شما
+    info = (
+        f"کاربر جدید!\n"
+        f"👤 نام: {user.first_name} {user.last_name or ''}\n"
+        f"🆔 آیدی عددی: {user.id}\n"
+        f"🔗 یوزرنیم: @{user.username}" if user.username else "🔗 بدون یوزرنیم"
+    )
+    await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=info)
+
+    # ارسال دکمه‌ها به کاربر
     keyboard = [
         [
             InlineKeyboardButton("رزومه", callback_data="send_resume"),
@@ -28,11 +41,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("فایل رزومه پیدا نشد.")
             return
 
-        try:
-            with open(PDF_PATH, "rb") as pdf_file:
-                await context.bot.send_document(chat_id=query.message.chat.id, document=pdf_file)
-        except Exception as e:
-            await query.edit_message_text(f"خطا در ارسال فایل: {e}")
+        with open(PDF_PATH, "rb") as pdf_file:
+            await context.bot.send_document(chat_id=query.message.chat.id, document=pdf_file)
 
     elif query.data == "send_project":
         await query.message.reply_text("این پروژه‌های من است: https://example.com/projects")
