@@ -1,21 +1,25 @@
-from dotenv import load_dotenv
 import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# بارگذاری فایل .env و گرفتن توکن
-load_dotenv()
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = os.environ["TOKEN"]  # از محیط دریافت می‌کنیم
 
-# هندلر دستور /start
+# وقتی کاربر /start بزند
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("سلام! من ربات شما هستم 🤖")
+    await update.message.reply_text("سلام! رزومه‌ی من برای شما ارسال می‌شود. لطفاً چند لحظه صبر کنید.")
 
-# اجرای ربات
-if __name__ == '__main__':
+    # مسیر فایل PDF رزومه
+    pdf_path = "resume.pdf"
+
+    # ارسال فایل
+    with open(pdf_path, "rb") as pdf_file:
+        await context.bot.send_document(chat_id=update.effective_chat.id, document=pdf_file)
+
+if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
 
+    # ثبت دستور start
     app.add_handler(CommandHandler("start", start))
 
-    print("✅ ربات با موفقیت راه‌اندازی شد...")
+    # اجرا
     app.run_polling()
