@@ -1,87 +1,132 @@
 import os
+from flask import Flask, request
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters
+)
 import threading
-from flask import Flask
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
 TOKEN = os.environ["TOKEN"]
-ADMIN_CHAT_ID = 6441736006  # آیدی عددی شما
-PDF_PATH = "resume.pdf"
+GROUP_CHAT_ID = -1002848835602
 
 app = Flask(__name__)
+
+LANGUAGES = {
+    "فارسی": "fa",
+    "English": "en",
+    "العربية": "ar",
+    "简体中文": "zh",
+    "Türkçe": "tr",
+    "한국어": "ko",
+    "Srpski": "sr",
+    "Español": "es"
+}
+
+RESUMES = {
+    "fa": "سلام! من دانیال فتح‌اللهی هستم، برنامه‌نویس و بازی‌ساز...",
+    "en": "Hello! I'm Danial Fathollahi, programmer and game developer...",
+    "ar": "مرحباً! أنا دانيال فتح اللهي، مبرمج ومطور ألعاب...",
+    "zh": "你好！我是丹尼尔·法塔拉希，程序员和游戏开发者...",
+    "tr": "Merhaba! Ben Danial Fathollahi, programcı ve oyun geliştiriciyim...",
+    "ko": "안녕하세요! 저는 다니엘 파톨라히입니다, 프로그래머이자 게임 개발자...",
+    "sr": "Zdravo! Ja sam Danijal Fatolahiji, programer i developer igara...",
+    "es": "¡Hola! Soy Danial Fathollahi, programador y desarrollador de juegos..."
+}
+
+user_languages = {}  # ذخیره زبان انتخابی هر کاربر {user_id: lang_code}
 
 @app.route('/ping')
 def ping():
     return 'pong'
 
-voice_files = {
-    'fa': 'رزومه به فارسی.ogg',
-    'en': 'Resume in English.ogg',
-    'ar': 'السيرة الذاتية بالعربية.ogg',
-    'zh': '简历中文.ogg'
-}
-
-translations = {
-    'fa': "من دانیال فتح‌اللهی هستم؛ برنامه‌نویس، طراح و بازی‌ساز با تجربه در یونیتی، وب، و نرم‌افزارهای گرافیکی. علاقه‌مند به تکنولوژی، ورزش، و نوآوری هستم.\n\nتحصیلات:\n- فارغ‌التحصیل رشته کامپیوتر، هنرستان نعیم‌آباد\n- دو مدرک از دانشگاه هاروارد: CS50x و CS50AI\n\nمهارت‌ها:\nPython، C، C#، HTML & CSS، Unity، WordPress، Photoshop، Premiere، After Effects، DaVinci Resolve، Office\n\nسازنده بازی آشوب کلمات در مایکت\nعضو تیم ملی واترپلو ایران",
-    'en': "I am Daniel Fathollahi; a programmer, designer, and game developer experienced in Unity, web, and graphic software. Passionate about technology, sports, and innovation.\n\nEducation:\n- Computer Science graduate, Naeem-Abad Technical School\n- Two certificates from Harvard University: CS50x and CS50AI\n\nSkills:\nPython, C, C#, HTML & CSS, Unity, WordPress, Photoshop, Premiere, After Effects, DaVinci Resolve, Office\n\nDeveloper of the mobile game \"Chaos of Words\" on Myket\nMember of Iran's national water polo team",
-    'ar': "أنا دانيال فتح‌اللهي؛ مبرمج، مصمم ومطور ألعاب ذو خبرة في Unity والويب وبرامج التصميم. شغوف بالتكنولوجيا والرياضة والابتكار.\n\nالتعليم:\n- خريج تخصص الحاسوب من مدرسة نعيم آباد التقنية\n- شهادتان من جامعة هارفارد: CS50x و CS50AI\n\nالمهارات:\nPython، C، C#، HTML & CSS، Unity، WordPress، Photoshop، Premiere، After Effects، DaVinci Resolve، Office\n\nمطور لعبة \"فوضى الكلمات\" على Myket\nعضو في الفريق الوطني الإيراني لكرة الماء",
-    'zh': "我是丹尼尔·法托拉希；一名程序员、设计师和游戏开发者，擅长Unity、网页开发和图形软件。热爱技术、运动和创新。\n\n教育背景：\n- 纳伊姆阿巴德技术学校计算机专业毕业\n- 哈佛大学CS50x和CS50AI证书\n\n技能：\nPython、C、C#、HTML & CSS、Unity、WordPress、Photoshop、Premiere、After Effects、DaVinci Resolve、Office\n\n《混乱之词》手机游戏开发者（Myket平台）\n伊朗国家水球队队员"
-}
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
+    user_languages[user.id] = None  # هنوز زبان انتخاب نشده
+
     info = (
         f"کاربر جدید!\n"
         f"👤 نام: {user.first_name} {user.last_name or ''}\n"
         f"🆔 آیدی عددی: {user.id}\n"
         f"🔗 یوزرنیم: @{user.username}" if user.username else "🔗 بدون یوزرنیم"
     )
-    await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=info)
+    await context.bot.send_message(chat_id=GROUP_CHAT_ID, text=info)
 
-    keyboard = [
-        [
-            InlineKeyboardButton("رزومه به فارسی 🇮🇷", callback_data="resume_fa"),
-            InlineKeyboardButton("Resume in English 🇬🇧", callback_data="resume_en")
-        ],
-        [
-            InlineKeyboardButton("السيرة الذاتية 🇸🇦", callback_data="resume_ar"),
-            InlineKeyboardButton("简历 🇨🇳", callback_data="resume_zh")
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    keyboard = [[KeyboardButton(lang)] for lang in LANGUAGES.keys()]
+    reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
 
     await update.message.reply_text(
-        "سلام! زبان مورد نظر برای دریافت رزومه را انتخاب کنید:",
+        "لطفاً زبان خود را انتخاب کنید:\nPlease select your language:",
         reply_markup=reply_markup
     )
 
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    lang_key = query.data.replace("resume_", "")
+async def language_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+    text = update.message.text
 
-    if lang_key in translations:
-        # ارسال متن رزومه
-        await query.message.reply_text(translations[lang_key])
-        # ارسال فایل صوتی اگر موجود باشد
-        voice_path = voice_files.get(lang_key)
-        if voice_path and os.path.exists(voice_path):
-            with open(voice_path, "rb") as voice:
-                await context.bot.send_voice(chat_id=query.message.chat.id, voice=voice)
+    if text not in LANGUAGES:
+        await update.message.reply_text("لطفاً یکی از زبان‌های موجود را انتخاب کنید.")
+        return
+
+    lang_code = LANGUAGES[text]
+    user_languages[user.id] = lang_code
+
+    welcome_texts = {
+        "fa": "زبان شما ثبت شد. هر سوالی داشتید بپرسید.",
+        "en": "Your language is set. Ask me anything.",
+        "ar": "تم تعيين لغتك. اسألني أي شيء.",
+        "zh": "你的语言已设置。有什么问题请问我。",
+        "tr": "Diliniz ayarlandı. Bana istediğini sor.",
+        "ko": "언어가 설정되었습니다. 무엇이든 물어보세요.",
+        "sr": "Vaš jezik je postavljen. Pitajte šta god želite.",
+        "es": "Tu idioma está configurado. Pregúntame lo que quieras."
+    }
+
+    await update.message.reply_text(welcome_texts.get(lang_code, "Language set."), reply_markup=None)
+
+async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+    text = update.message.text.lower()
+    lang = user_languages.get(user.id)
+
+    if lang is None:
+        await update.message.reply_text("لطفاً ابتدا زبان خود را انتخاب کنید.")
+        return
+
+    about_keywords = {
+        "fa": ["درباره من", "همکاری با من"],
+        "en": ["about me", "collaboration"],
+        "ar": ["عني", "تعاون"],
+        "zh": ["关于我", "合作"],
+        "tr": ["hakkımda", "iş birliği"],
+        "ko": ["내 소개", "협력"],
+        "sr": ["o meni", "saradnja"],
+        "es": ["sobre mí", "colaboración"]
+    }
+
+    if any(keyword in text for keyword in about_keywords.get(lang, [])):
+        await update.message.reply_text(RESUMES[lang])
     else:
-        await query.message.reply_text("رزومه مورد نظر یافت نشد.")
-
-    # ارسال فایل PDF کلی (اختیاری)
-    if os.path.exists(PDF_PATH):
-        with open(PDF_PATH, "rb") as pdf_file:
-            await context.bot.send_document(chat_id=query.message.chat.id, document=pdf_file)
+        default_responses = {
+            "fa": "لطفاً سوالتان را واضح‌تر بپرسید یا «درباره من» یا «همکاری با من» را تایپ کنید.",
+            "en": "Please ask clearly or type 'about me' or 'collaboration'.",
+            "ar": "يرجى طرح السؤال بوضوح أو كتابة 'عني' أو 'تعاون'.",
+            "zh": "请清楚提问，或输入“关于我”或“合作”。",
+            "tr": "Lütfen net sorun veya 'hakkımda' ya da 'iş birliği' yazın.",
+            "ko": "명확하게 질문하거나 '내 소개' 또는 '협력'을 입력하세요.",
+            "sr": "Molimo pitajte jasno ili napišite 'o meni' ili 'saradnja'.",
+            "es": "Por favor, pregunta claramente o escribe 'sobre mí' o 'colaboración'."
+        }
+        await update.message.reply_text(default_responses.get(lang, "Please ask clearly."))
 
 def run_bot():
-    app_telegram = ApplicationBuilder().token(TOKEN).build()
-    app_telegram.add_handler(CommandHandler("start", start))
-    app_telegram.add_handler(CallbackQueryHandler(button_handler))
+    application = ApplicationBuilder().token(TOKEN).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, language_handler))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+
     print("ربات در حال اجراست...")
-    app_telegram.run_polling()
+    application.run_polling()
 
 if __name__ == "__main__":
     threading.Thread(target=lambda: app.run(host="0.0.0.0", port=8000)).start()
