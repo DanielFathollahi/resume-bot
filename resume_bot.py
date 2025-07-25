@@ -1,25 +1,24 @@
 import os
-from flask import Flask, request
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from flask import Flask
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters
+    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 )
 import threading
 
 TOKEN = os.environ["TOKEN"]
 GROUP_CHAT_ID = -1002848835602
 
-app = Flask(__name__)
-
+# اضافه کردن ایموجی شیشه‌ای کنار هر زبان برای حس بهتر
 LANGUAGES = {
-    "فارسی": "fa",
-    "English": "en",
-    "العربية": "ar",
-    "简体中文": "zh",
-    "Türkçe": "tr",
-    "한국어": "ko",
-    "Srpski": "sr",
-    "Español": "es"
+    "🔲 فارسی": "fa",
+    "🔲 English": "en",
+    "🔲 العربية": "ar",
+    "🔲 简体中文": "zh",
+    "🔲 Türkçe": "tr",
+    "🔲 한국어": "ko",
+    "🔲 Srpski": "sr",
+    "🔲 Español": "es"
 }
 
 RESUMES = {
@@ -33,7 +32,9 @@ RESUMES = {
     "es": "¡Hola! Soy Danial Fathollahi, programador y desarrollador de juegos..."
 }
 
-user_languages = {}  # ذخیره زبان انتخابی هر کاربر {user_id: lang_code}
+user_languages = {}
+
+app = Flask(__name__)
 
 @app.route('/ping')
 def ping():
@@ -41,7 +42,7 @@ def ping():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
-    user_languages[user.id] = None  # هنوز زبان انتخاب نشده
+    user_languages[user.id] = None
 
     info = (
         f"کاربر جدید!\n"
@@ -55,33 +56,36 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
 
     await update.message.reply_text(
-        "لطفاً زبان خود را انتخاب کنید:\nPlease select your language:",
+        "لطفاً زبان خود را انتخاب کنید:",
         reply_markup=reply_markup
     )
 
 async def language_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     text = update.message.text
-
     if text not in LANGUAGES:
-        await update.message.reply_text("لطفاً یکی از زبان‌های موجود را انتخاب کنید.")
+        await update.message.reply_text("لطفاً یکی از زبان‌ها را انتخاب کنید.")
         return
-
     lang_code = LANGUAGES[text]
     user_languages[user.id] = lang_code
 
     welcome_texts = {
-        "fa": "زبان شما ثبت شد. هر سوالی داشتید بپرسید.",
-        "en": "Your language is set. Ask me anything.",
-        "ar": "تم تعيين لغتك. اسألني أي شيء.",
-        "zh": "你的语言已设置。有什么问题请问我。",
-        "tr": "Diliniz ayarlandı. Bana istediğini sor.",
-        "ko": "언어가 설정되었습니다. 무엇이든 물어보세요.",
-        "sr": "Vaš jezik je postavljen. Pitajte šta god želite.",
-        "es": "Tu idioma está configurado. Pregúntame lo que quieras."
+        "fa": "زبان شما ثبت شد. همه رزومه‌ها را برایتان ارسال می‌کنم.",
+        "en": "Language set. Sending all resumes now.",
+        "ar": "تم تعيين اللغة. سأرسل جميع السير الذاتية الآن.",
+        "zh": "语言已设置。现在发送所有简历。",
+        "tr": "Dil ayarlandı. Tüm özgeçmişleri gönderiyorum.",
+        "ko": "언어가 설정되었습니다. 모든 이력서를 보내드립니다.",
+        "sr": "Jezik je postavljen. Šaljem sve biografije sada.",
+        "es": "Idioma establecido. Enviando todos los currículums ahora."
     }
+    await update.message.reply_text(welcome_texts[lang_code])
 
-    await update.message.reply_text(welcome_texts.get(lang_code, "Language set."), reply_markup=None)
+    # ارسال همه رزومه ها در یک پیام یا چند پیام جدا (اینجا یک پیام طولانی)
+    all_resumes_text = "\n\n".join(
+        f"--- {k} ---\n{v}" for k, v in RESUMES.items()
+    )
+    await update.message.reply_text(all_resumes_text)
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
