@@ -1,9 +1,20 @@
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
+import os
+import threading
+from flask import Flask
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, CallbackQueryHandler,
+    ContextTypes, ConversationHandler
+)
 
-LANG, MAIN_MENU = range(2)
+TOKEN = os.environ.get("TOKEN")
+ADMIN_CHAT_ID = 6441736006  # آیدی عددی شما
 
-# تعریف زبان‌ها و پرچم‌ها
+app = Flask(__name__)
+
+LANG_SELECT, MAIN_MENU = range(2)
+
+# زبان‌ها و پرچم‌ها
 LANGUAGES = {
     'fa': {'name': 'فارسی', 'flag': '🇮🇷'},
     'ar': {'name': 'العربية', 'flag': '🇸🇦'},
@@ -15,60 +26,61 @@ LANGUAGES = {
     'en': {'name': 'English', 'flag': '🇬🇧'},
 }
 
-# متون به زبان‌ها (نمونه کامل‌تر متن "درباره من" رو جایگذاری کردم)
+# متن‌های چندزبانه
 TEXTS = {
     'fa': {
-        'welcome': 'لطفاً زبان خود را انتخاب کنید:',
-        'menu': 'لطفاً یکی از گزینه‌ها را انتخاب کنید:',
+        'choose_lang': 'لطفاً زبان خود را انتخاب کنید:',
+        'menu_text': 'لطفاً یکی از گزینه‌ها را انتخاب کنید:',
         'chat_ai': '💬 چت با هوش مصنوعی',
         'about_me': '🤝 همکاری با من',
         'resume': """سلام! 👋  
-من **دانیال فتح‌اللهی** هستم؛ یک فرد خلاق، پرتلاش و عاشق تکنولوژی! 💡  
-🔧 برنامه‌نویس، 🎮 توسعه‌دهنده بازی و 🎨 طراح گرافیک با تجربه واقعی پروژه.
+من **دانیال فتح‌اللهی** هستم؛ یه آدم خلاق، پرتلاش و عاشق تکنولوژی! 💡  
+🔧 برنامه‌نویس، 🎮 بازی‌ساز و 🎨 طراح گرافیک با تجربه در ساخت پروژه‌های واقعی.
 
 💻 زبان‌های برنامه‌نویسی:
 • Python 🐍  
 • C / C# 💻  
 • HTML & CSS 🌐  
 
-🕹️ توسعه بازی:
+🕹️ بازی‌سازی:
 • ساخت بازی با Unity  
-• انتشار بازی در Myket: «آشوب کلمات» ⚔️🧩  
+• انتشار بازی در مایکت: «آشوب کلمات» ⚔️🧩  
 
 🌍 توسعه وب:
 • طراحی سایت با WordPress  
 • مدیریت و پشتیبانی سایت‌های محتوایی  
 
-🎬 طراحی و تدوین گرافیک و ویدیو:
+🎬 طراحی و ویرایش گرافیک و ویدیو:
 • Photoshop 🖌️  
 • Premiere 🎞️  
 • After Effects 🌟  
 • DaVinci Resolve 🎥  
 
-📊 نرم‌افزارهای بهره‌وری:
+📊 نرم‌افزارهای کاربردی:
 • Microsoft Office (ورد، اکسل، پاورپوینت) 📄📈  
 
-📚 مدارک:
-• CS50x – علوم کامپیوتر (دانشگاه هاروارد)  
-• CS50s – هوش مصنوعی (دانشگاه هاروارد) 🤖
+📚 دوره‌ها و مدارک بین‌المللی:
+• CS50x – مبانی علوم کامپیوتر (Harvard University)  
+• CS50s – هوش مصنوعی (Harvard University) 🤖
 
 🏅 عضو تیم ملی واترپلو ایران 🏊‍♂️  
-📚 علاقه‌مند به مطالعه، ورزش و یادگیری مادام‌العمر  
-🎯 هدف: ساخت محصولات نوآورانه و تاثیرگذار فناوری
+📚 علاقه‌مند به مطالعه، ورزش و یادگیری مداوم  
+🎯 هدفم: ساخت محصولات تکنولوژیک تأثیرگذار و خلاقانه
 
-📍 یزد – ایران  
-📧 daniel.fathollahi.4@gmail.com  
-📱 0933-835-8107
+📞 راه‌های ارتباطی:
+📍 موقعیت: یزد – ایران  
+📧 ایمیل: daniel.fathollahi.4@gmail.com  
+📱 شماره تماس: 0933-835-8107
 """,
     },
     'ar': {
-        'welcome': 'يرجى اختيار لغتك:',
-        'menu': 'يرجى اختيار أحد الخيارات:',
-        'chat_ai': '💬 الدردشة مع الذكاء الاصطناعي',
+        'choose_lang': 'يرجى اختيار لغتك:',
+        'menu_text': 'يرجى اختيار أحد الخيارات:',
+        'chat_ai': '💬 دردشة مع الذكاء الاصطناعي',
         'about_me': '🤝 التعاون معي',
         'resume': """مرحباً! 👋  
-أنا **دانيال فتح اللهي**، شخص مبدع، مجتهد ومحب للتكنولوجيا! 💡  
-🔧 مبرمج، 🎮 مطور ألعاب، و 🎨 مصمم جرافيك ذو خبرة حقيقية.
+أنا **دانيال فتح اللهي**، شخص مبدع ومجتهد ومحب للتكنولوجيا! 💡  
+🔧 مبرمج، 🎮 مطور ألعاب، و🎨 مصمم جرافيك ذو خبرة في المشاريع الواقعية.
 
 💻 لغات البرمجة:
 • Python 🐍  
@@ -76,14 +88,14 @@ TEXTS = {
 • HTML & CSS 🌐  
 
 🕹️ تطوير الألعاب:
-• صناعة ألعاب باستخدام Unity  
+• تطوير الألعاب باستخدام Unity  
 • نشر لعبة على Myket: "فوضى الكلمات" ⚔️🧩  
 
 🌍 تطوير المواقع:
-• تصميم مواقع بواسطة WordPress  
+• تصميم المواقع باستخدام WordPress  
 • إدارة ودعم المواقع المحتوية  
 
-🎬 تصميم وتحرير الفيديو والجرافيك:
+🎬 تصميم وتحرير الجرافيك والفيديو:
 • Photoshop 🖌️  
 • Premiere 🎞️  
 • After Effects 🌟  
@@ -96,67 +108,67 @@ TEXTS = {
 • CS50x – علوم الحاسوب (جامعة هارفارد)  
 • CS50s – الذكاء الاصطناعي (جامعة هارفارد) 🤖
 
-🏅 عضو المنتخب الوطني الإيراني للواتر بولو 🏊‍♂️  
-📚 مهتم بالقراءة، الرياضة، والتعلم المستمر  
-🎯 الهدف: إنشاء منتجات تقنية مبتكرة وفعالة
+🏅 عضو في المنتخب الوطني الإيراني للواتر بولو 🏊‍♂️  
+📚 مهتم بالقراءة والرياضة والتعلم المستمر  
+🎯 الهدف: إنشاء منتجات تقنية مبتكرة وذات تأثير
 
-📍 يزد – إيران  
-📧 daniel.fathollahi.4@gmail.com  
-📱 0933-835-8107
+📍 الموقع: يزد – إيران  
+📧 البريد الإلكتروني: daniel.fathollahi.4@gmail.com  
+📱 رقم الهاتف: 0933-835-8107
 """
     },
     'zh': {
-        'welcome': '请选择您的语言：',
-        'menu': '请选择以下选项之一：',
+        'choose_lang': '请选择您的语言：',
+        'menu_text': '请选择一个选项：',
         'chat_ai': '💬 与人工智能聊天',
         'about_me': '🤝 与我合作',
         'resume': """你好！👋  
-我是**丹尼尔·法塔拉希**，一个有创造力、勤奋且热爱科技的人！💡  
-🔧 程序员，🎮 游戏开发者，🎨 平面设计师，拥有真实项目经验。
+我是**丹尼尔·法塔拉希**，一个有创造力、努力工作并热爱科技的人！💡  
+🔧 程序员、🎮 游戏开发者 和 🎨 平面设计师，拥有实际项目经验。
 
-💻 编程语言：
+💻 编程语言:
 • Python 🐍  
 • C / C# 💻  
-• HTML & CSS 🌐  
+• HTML 和 CSS 🌐  
 
-🕹️ 游戏开发：
-• 使用Unity制作游戏  
-• 在Myket发布了游戏：“混乱之词” ⚔️🧩  
+🕹️ 游戏开发:
+• 使用 Unity 开发游戏  
+• 已在 Myket 上发布游戏《混乱之词》⚔️🧩  
 
-🌍 网站开发：
-• 使用WordPress设计网站  
-• 内容网站管理和支持  
+🌍 网站开发:
+• 使用 WordPress 设计网站  
+• 内容网站的管理和支持  
 
-🎬 图形和视频编辑：
+🎬 平面与视频编辑:
 • Photoshop 🖌️  
 • Premiere 🎞️  
 • After Effects 🌟  
 • DaVinci Resolve 🎥  
 
-📊 办公软件：
+📊 办公软件:
 • Microsoft Office (Word, Excel, PowerPoint) 📄📈  
 
-📚 认证：
+📚 认证:
 • CS50x – 计算机科学 (哈佛大学)  
 • CS50s – 人工智能 (哈佛大学) 🤖
 
 🏅 伊朗国家水球队成员 🏊‍♂️  
-📚 喜欢阅读、运动和终身学习  
-🎯 目标：创造创新且有影响力的科技产品
+📚 热爱阅读、运动和持续学习  
+🎯 目标：打造创新且有影响力的科技产品
 
-📍 位置：伊朗 亚兹德  
-📧 daniel.fathollahi.4@gmail.com  
-📱 0933-835-8107
+📍 地点：伊朗–亚兹德  
+📧 邮箱：daniel.fathollahi.4@gmail.com  
+📱 电话：0933-835-8107
 """
     },
     'tr': {
-        'welcome': 'Lütfen dilinizi seçiniz:',
-        'menu': 'Lütfen seçeneklerden birini seçiniz:',
-        'chat_ai': '💬 Yapay zeka ile sohbet',
-        'about_me': '🤝 Benimle çalış',
+        'choose_lang': 'Lütfen dilinizi seçin:',
+        'menu_text': 'Lütfen bir seçenek seçin:',
+        'chat_ai': '💬 Yapay Zeka ile Sohbet',
+        'about_me': '🤝 Benimle İş Birliği',
         'resume': """Merhaba! 👋  
-Ben **Danial Fathollahi**; yaratıcı, çalışkan ve teknoloji meraklısıyım! 💡  
-🔧 Yazılımcı, 🎮 Oyun Geliştirici ve 🎨 Grafik Tasarımcıyım, gerçek proje deneyimim var.
+Ben **Danial Fathollahi**; yaratıcı, çalışkan ve teknoloji tutkunu biriyim! 💡  
+🔧 Yazılımcı, 🎮 Oyun Geliştirici ve 🎨 Grafik Tasarımcı olarak gerçek projelerde deneyim sahibiyim.
 
 💻 Programlama Dilleri:
 • Python 🐍  
@@ -165,11 +177,11 @@ Ben **Danial Fathollahi**; yaratıcı, çalışkan ve teknoloji meraklısıyım!
 
 🕹️ Oyun Geliştirme:
 • Unity ile oyun geliştirme  
-• Myket’te yayınlanan oyun: “Kelimelerin Kaosu” ⚔️🧩  
+• Myket'te yayınlanan oyun: “Kelimelerin Kaosu” ⚔️🧩  
 
 🌍 Web Geliştirme:
-• WordPress ile web sitesi tasarımı  
-• İçerik sitesi yönetimi ve destek  
+• WordPress ile web tasarımı  
+• İçerik sitelerinin yönetimi ve desteği  
 
 🎬 Grafik ve Video Düzenleme:
 • Photoshop 🖌️  
@@ -181,26 +193,26 @@ Ben **Danial Fathollahi**; yaratıcı, çalışkan ve teknoloji meraklısıyım!
 • Microsoft Office (Word, Excel, PowerPoint) 📄📈  
 
 📚 Sertifikalar:
-• CS50x – Bilgisayar Bilimleri (Harvard Üniversitesi)  
+• CS50x – Bilgisayar Bilimi (Harvard Üniversitesi)  
 • CS50s – Yapay Zeka (Harvard Üniversitesi) 🤖
 
-🏅 İran Su Topu Milli Takımı Üyesi 🏊‍♂️  
-📚 Okumaya, spora ve sürekli öğrenmeye ilgiliyim  
-🎯 Amaç: Yenilikçi ve etkileyici teknoloji ürünleri geliştirmek
+🏅 İran Su Topu Milli Takımı üyesi 🏊‍♂️  
+📚 Okuma, spor ve sürekli öğrenmeye ilgi duyuyorum  
+🎯 Amacım: Yenilikçi ve etkileyici teknoloji ürünleri geliştirmek
 
 📍 Konum: Yezd – İran  
-📧 daniel.fathollahi.4@gmail.com  
-📱 0933-835-8107
+📧 E-posta: daniel.fathollahi.4@gmail.com  
+📱 Telefon: 0933-835-8107
 """
     },
     'ko': {
-        'welcome': '언어를 선택하세요:',
-        'menu': '옵션 중 하나를 선택하세요:',
-        'chat_ai': '💬 인공지능과 대화하기',
-        'about_me': '🤝 나와 협력하기',
+        'choose_lang': '언어를 선택하세요:',
+        'menu_text': '옵션을 선택하세요:',
+        'chat_ai': '💬 AI와 채팅하기',
+        'about_me': '🤝 저와 협력하기',
         'resume': """안녕하세요! 👋  
-저는 **다니엘 파톨라히**입니다. 창의적이고, 성실하며, 기술을 사랑하는 사람입니다! 💡  
-🔧 프로그래머, 🎮 게임 개발자, 🎨 그래픽 디자이너이며 실제 프로젝트 경험이 있습니다.
+저는 **다니엘 파톨라히**입니다. 창의적이고 성실하며 기술을 사랑하는 사람입니다! 💡  
+🔧 프로그래머, 🎮 게임 개발자, 🎨 그래픽 디자이너로 실제 프로젝트 경험이 있습니다.
 
 💻 프로그래밍 언어:
 • Python 🐍  
@@ -208,20 +220,20 @@ Ben **Danial Fathollahi**; yaratıcı, çalışkan ve teknoloji meraklısıyım!
 • HTML & CSS 🌐  
 
 🕹️ 게임 개발:
-• Unity로 게임 제작  
-• Myket에 “단어의 혼돈” 게임 출시 ⚔️🧩  
+• Unity를 사용한 게임 제작  
+• Myket에 게임 출시: "단어의 혼돈" ⚔️🧩  
 
 🌍 웹 개발:
-• WordPress로 웹사이트 디자인  
+• WordPress를 이용한 웹사이트 디자인  
 • 콘텐츠 사이트 관리 및 지원  
 
-🎬 그래픽 및 비디오 편집:
+🎬 그래픽 및 영상 편집:
 • Photoshop 🖌️  
 • Premiere 🎞️  
 • After Effects 🌟  
 • DaVinci Resolve 🎥  
 
-📊 생산성 소프트웨어:
+📊 오피스 소프트웨어:
 • Microsoft Office (Word, Excel, PowerPoint) 📄📈  
 
 📚 자격증:
@@ -229,22 +241,22 @@ Ben **Danial Fathollahi**; yaratıcı, çalışkan ve teknoloji meraklısıyım!
 • CS50s – 인공지능 (하버드 대학교) 🤖
 
 🏅 이란 국가 수구팀 멤버 🏊‍♂️  
-📚 독서, 스포츠, 평생 학습에 관심 많음  
-🎯 목표: 혁신적이고 영향력 있는 기술 제품 만들기
+📚 독서, 운동, 평생 학습에 관심이 많습니다  
+🎯 목표: 혁신적이고 영향력 있는 기술 제품을 만드는 것
 
-📍 위치: 이란 야즈드  
-📧 daniel.fathollahi.4@gmail.com  
-📱 0933-835-8107
+📍 위치: 이란 – 야즈드  
+📧 이메일: daniel.fathollahi.4@gmail.com  
+📱 전화번호: 0933-835-8107
 """
     },
     'sr': {
-        'welcome': 'Izaberite jezik:',
-        'menu': 'Izaberite jednu od opcija:',
-        'chat_ai': '💬 Čat sa veštačkom inteligencijom',
+        'choose_lang': 'Izaberite svoj jezik:',
+        'menu_text': 'Izaberite opciju:',
+        'chat_ai': '💬 Razgovor sa AI',
         'about_me': '🤝 Saradnja sa mnom',
         'resume': """Zdravo! 👋  
 Ja sam **Danijal Fatolahiji**, kreativan, vredan i zaljubljenik u tehnologiju! 💡  
-🔧 Programer, 🎮 Razvijač igara i 🎨 Grafički dizajner sa stvarnim iskustvom.
+🔧 Programer, 🎮 programer igara i 🎨 grafički dizajner sa iskustvom u stvarnim projektima.
 
 💻 Programski jezici:
 • Python 🐍  
@@ -256,8 +268,8 @@ Ja sam **Danijal Fatolahiji**, kreativan, vredan i zaljubljenik u tehnologiju! �
 • Objavljena igra na Myket: “Haos reči” ⚔️🧩  
 
 🌍 Web razvoj:
-• Dizajn sajtova pomoću WordPress  
-• Upravljanje i podrška sajtovima  
+• Dizajniranje sajtova pomoću WordPress  
+• Upravljanje i podrška za sajtove sa sadržajem  
 
 🎬 Grafička i video obrada:
 • Photoshop 🖌️  
@@ -269,38 +281,38 @@ Ja sam **Danijal Fatolahiji**, kreativan, vredan i zaljubljenik u tehnologiju! �
 • Microsoft Office (Word, Excel, PowerPoint) 📄📈  
 
 📚 Sertifikati:
-• CS50x – Računarske nauke (Harvard Univerzitet)  
-• CS50s – Veštačka inteligencija (Harvard Univerzitet) 🤖
+• CS50x – Računarske nauke (Univerzitet Harvard)  
+• CS50s – Veštačka inteligencija (Univerzitet Harvard) 🤖
 
-🏅 Član iranske reprezentacije u vaterpolu 🏊‍♂️  
+🏅 Član reprezentacije Irana u vaterpolu 🏊‍♂️  
 📚 Zainteresovan za čitanje, sport i kontinuirano učenje  
 🎯 Cilj: Kreiranje inovativnih i uticajnih tehnoloških proizvoda
 
 📍 Lokacija: Jazd – Iran  
-📧 daniel.fathollahi.4@gmail.com  
-📱 0933-835-8107
+📧 Email: daniel.fathollahi.4@gmail.com  
+📱 Telefon: 0933-835-8107
 """
     },
     'es': {
-        'welcome': 'Por favor seleccione su idioma:',
-        'menu': 'Por favor seleccione una opción:',
-        'chat_ai': '💬 Chat con inteligencia artificial',
+        'choose_lang': 'Por favor, selecciona tu idioma:',
+        'menu_text': 'Por favor, elige una opción:',
+        'chat_ai': '💬 Chat con IA',
         'about_me': '🤝 Colaborar conmigo',
         'resume': """¡Hola! 👋  
-Soy **Danial Fathollahi**, una persona creativa, trabajadora y apasionada por la tecnología! 💡  
-🔧 Programador, 🎮 Desarrollador de juegos y 🎨 Diseñador gráfico con experiencia real.
+Soy **Danial Fathollahi**, una persona creativa, trabajadora y apasionada por la tecnología. 💡  
+🔧 Programador, 🎮 desarrollador de videojuegos y 🎨 diseñador gráfico con experiencia real en proyectos.
 
 💻 Lenguajes de programación:
 • Python 🐍  
 • C / C# 💻  
 • HTML & CSS 🌐  
 
-🕹️ Desarrollo de juegos:
+🕹️ Desarrollo de videojuegos:
 • Creación de juegos con Unity  
 • Juego publicado en Myket: “Caos de Palabras” ⚔️🧩  
 
 🌍 Desarrollo web:
-• Diseño web con WordPress  
+• Diseño de sitios web con WordPress  
 • Gestión y soporte de sitios de contenido  
 
 🎬 Diseño gráfico y edición de video:
@@ -316,18 +328,18 @@ Soy **Danial Fathollahi**, una persona creativa, trabajadora y apasionada por la
 • CS50x – Ciencias de la Computación (Universidad de Harvard)  
 • CS50s – Inteligencia Artificial (Universidad de Harvard) 🤖
 
-🏅 Miembro del equipo nacional de waterpolo de Irán 🏊‍♂️  
+🏅 Miembro del equipo nacional iraní de waterpolo 🏊‍♂️  
 📚 Apasionado por la lectura, el deporte y el aprendizaje continuo  
 🎯 Objetivo: Crear productos tecnológicos innovadores e impactantes
 
 📍 Ubicación: Yazd – Irán  
-📧 daniel.fathollahi.4@gmail.com  
-📱 0933-835-8107
+📧 Correo: daniel.fathollahi.4@gmail.com  
+📱 Teléfono: 0933-835-8107
 """
     },
     'en': {
-        'welcome': 'Please select your language:',
-        'menu': 'Please choose an option:',
+        'choose_lang': 'Please select your language:',
+        'menu_text': 'Please choose an option:',
         'chat_ai': '💬 Chat with AI',
         'about_me': '🤝 Collaborate with me',
         'resume': """Hello! 👋  
@@ -365,86 +377,98 @@ I'm **Danial Fathollahi**, a creative, hardworking, and tech-loving individual! 
 🎯 Goal: Creating innovative and impactful tech products
 
 📍 Location: Yazd – Iran  
-📧 daniel.fathollahi.4@gmail.com  
-📱 0933-835-8107
+📧 Email: daniel.fathollahi.4@gmail.com  
+📱 Phone: 0933-835-8107
 """
-    }
+    },
 }
 
 user_langs = {}
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    keyboard = [[
-        KeyboardButton(f"{data['flag']} {data['name']}") for code, data in LANGUAGES.items()
-    ]]
-    await update.message.reply_text(
-        "لطفاً زبان خود را انتخاب کنید:",
-        reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+@app.route('/ping')
+def ping():
+    return 'pong'
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+    info = (
+        f"New user!\n"
+        f"👤 Name: {user.first_name} {user.last_name or ''}\n"
+        f"🆔 ID: {user.id}\n"
+        f"🔗 Username: @{user.username}" if user.username else "🔗 No username"
     )
-    return LANG
+    await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=info)
 
-async def lang_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    text = update.message.text
-    user_id = update.effective_user.id
+    keyboard = [
+        [InlineKeyboardButton(f"{v['flag']} {v['name']}", callback_data=f"lang_{code}")]
+        for code, v in LANGUAGES.items()
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # تشخیص زبان انتخاب شده با پرچم یا نام
-    chosen_lang = None
-    for code, data in LANGUAGES.items():
-        if data['flag'] in text or data['name'] in text:
-            chosen_lang = code
-            break
+    await update.message.reply_text("Please select your language / لطفاً زبان خود را انتخاب کنید:", reply_markup=reply_markup)
+    return LANG_SELECT
 
-    if not chosen_lang:
-        await update.message.reply_text("زبان معتبر انتخاب نشده، لطفا دوباره انتخاب کنید.")
-        return LANG
+async def lang_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
 
-    user_langs[user_id] = chosen_lang
-    lang_texts = TEXTS[chosen_lang]
+    user_id = query.from_user.id
+    lang_code = query.data.split('_')[1]
 
-    keyboard = [[
-        KeyboardButton(lang_texts['chat_ai']),
-        KeyboardButton(lang_texts['about_me'])
-    ]]
+    if lang_code not in LANGUAGES:
+        await query.edit_message_text("Invalid language selected.")
+        return ConversationHandler.END
 
-    await update.message.reply_text(
-        f"{lang_texts['menu']} {LANGUAGES[chosen_lang]['flag']}",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    )
+    user_langs[user_id] = lang_code
+    texts = TEXTS[lang_code]
+
+    keyboard = [
+        [
+            InlineKeyboardButton(texts['chat_ai'], callback_data='chat_ai'),
+            InlineKeyboardButton(texts['about_me'], callback_data='about_me'),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(f"{LANGUAGES[lang_code]['flag']} {texts['menu_text']}", reply_markup=reply_markup)
     return MAIN_MENU
 
-async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user_id = update.effective_user.id
-    chosen_lang = user_langs.get(user_id, 'en')
-    lang_texts = TEXTS[chosen_lang]
+async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
 
-    text = update.message.text
-    if text == lang_texts['about_me']:
-        # ارسال رزومه به زبان انتخاب شده
-        await update.message.reply_text(f"{LANGUAGES[chosen_lang]['flag']} {lang_texts['resume']}", parse_mode='Markdown')
-    elif text == lang_texts['chat_ai']:
-        # پیام خوش‌آمدگویی به چت هوش مصنوعی (قابل توسعه)
-        await update.message.reply_text(f"{LANGUAGES[chosen_lang]['flag']} خوش آمدید به بخش چت هوش مصنوعی! این بخش در حال توسعه است.")
+    user_id = query.from_user.id
+    lang_code = user_langs.get(user_id, 'en')
+    texts = TEXTS[lang_code]
+
+    if query.data == 'about_me':
+        await query.edit_message_text(f"{LANGUAGES[lang_code]['flag']} {texts['resume']}")
+    elif query.data == 'chat_ai':
+        # این قسمت را به دلخواه می‌توانید به چت هوش مصنوعی متصل کنید
+        await query.edit_message_text(f"{LANGUAGES[lang_code]['flag']} بخش چت هوش مصنوعی در حال توسعه است.")
     else:
-        await update.message.reply_text(lang_texts['menu'])
+        await query.edit_message_text(f"{LANGUAGES[lang_code]['flag']} {texts['menu_text']}")
 
     return MAIN_MENU
 
-def main():
-    app = Application.builder().token("YOUR_TELEGRAM_BOT_TOKEN").build()
+def run_bot():
+    application = ApplicationBuilder().token(TOKEN).build()
 
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-            LANG: [MessageHandler(filters.TEXT & ~filters.COMMAND, lang_choice)],
-            MAIN_MENU: [MessageHandler(filters.TEXT & ~filters.COMMAND, main_menu)],
+            LANG_SELECT: [CallbackQueryHandler(lang_handler, pattern=r'^lang_')],
+            MAIN_MENU: [CallbackQueryHandler(main_menu_handler, pattern=r'^(about_me|chat_ai)$')],
         },
-        fallbacks=[]
+        fallbacks=[],
+        allow_reentry=True,
     )
 
-    app.add_handler(conv_handler)
+    application.add_handler(conv_handler)
 
-    print("Bot started...")
-    app.run_polling()
+    print("Bot is running...")
+    application.run_polling()
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8000)).start()
+    run_bot()
