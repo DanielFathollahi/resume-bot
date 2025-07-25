@@ -1,67 +1,118 @@
 import os
-from flask import Flask, request
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 import threading
+from flask import Flask
+from telegram import (
+    Update, KeyboardButton, ReplyKeyboardMarkup,
+    InlineKeyboardButton, InlineKeyboardMarkup
+)
+from telegram.ext import (
+    Application, CommandHandler, CallbackQueryHandler, MessageHandler,
+    ConversationHandler, ContextTypes, filters
+)
 
-TOKEN = os.environ["TOKEN"]
-PDF_PATH = "resume.pdf"
-ADMIN_CHAT_ID = 6441736006  # آیدی عددی شما
+TOKEN = os.getenv("TOKEN")
+GROUP_CHAT_ID = -1002542201765
 
 app = Flask(__name__)
 
-@app.route('/ping')
+@app.route('/')
 def ping():
     return 'pong'
 
-# کد ربات تلگرام
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.message.from_user
-    info = (
-        f"کاربر جدید!\n"
-        f"👤 نام: {user.first_name} {user.last_name or ''}\n"
-        f"🆔 آیدی عددی: {user.id}\n"
-        f"🔗 یوزرنیم: @{user.username}" if user.username else "🔗 بدون یوزرنیم"
-    )
-    await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=info)
+ASK_LANGUAGE, ASK_NAME, ASK_JOB, ASK_PHONE, ASK_EMAIL = range(5)
 
-    keyboard = [
-        [
-            InlineKeyboardButton("رزومه", callback_data="send_resume"),
-            InlineKeyboardButton("پروژه", callback_data="send_project"),
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+# مسیر فایل‌های صوتی معرفی رزومه
+voice_files = {
+    'fa': 'رزومه به فارسی.ogg',
+    'en': 'Resume in English.ogg',
+    'ar': 'السيرة الذاتية بالعربية.ogg',
+    'zh': '简历中文.ogg'
+}
 
-    await update.message.reply_text(
-        "سلام! یکی از گزینه‌ها را انتخاب کنید:",
-        reply_markup=reply_markup
-    )
+translations = {
+    'fa': {
+        'intro': """
+من دانیال فتح‌اللهی هستم؛ برنامه‌نویس، طراح و بازی‌ساز با تجربه در یونیتی، وب، و نرم‌افزارهای گرافیکی. علاقه‌مند به تکنولوژی، ورزش، و نوآوری هستم.
+        
+تحصیلات:
+- فارغ‌التحصیل رشته کامپیوتر، هنرستان نعیم‌آباد
+- دو مدرک از دانشگاه هاروارد: CS50x و CS50AI
 
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+مهارت‌ها:
+Python، C، C#، HTML & CSS، Unity، WordPress، Photoshop، Premiere، After Effects، DaVinci Resolve، Office
+        
+سازنده بازی آشوب کلمات در مایکت
+عضو تیم ملی واترپلو ایران
+""",
+        'ask_name': "لطفاً نام و نام خانوادگی خود را وارد کنید ✍️",
+        'ask_job': "لطفاً اطلاعات شغلی خود را بنویسید ✍️",
+        'ask_phone': "لطفاً شماره تلفن خود را ارسال کنید 📱",
+        'ask_email': "لطفاً ایمیل خود را وارد کنید 📧",
+        'thanks': "✅ اطلاعات شما ثبت شد. ممنون 🙏",
+        'cancel': "لغو شد."
+    },
+    'en': {
+        'intro': """
+I am Daniel Fathollahi; a programmer, designer, and game developer experienced in Unity, web, and graphic software. Passionate about technology, sports, and innovation.
 
-    if query.data == "send_resume":
-        if not os.path.exists(PDF_PATH):
-            await query.edit_message_text("فایل رزومه پیدا نشد.")
-            return
+Education:
+- Computer Science graduate, Naeem-Abad Technical School
+- Two certificates from Harvard University: CS50x and CS50AI
 
-        with open(PDF_PATH, "rb") as pdf_file:
-            await context.bot.send_document(chat_id=query.message.chat.id, document=pdf_file)
+Skills:
+Python, C, C#, HTML & CSS, Unity, WordPress, Photoshop, Premiere, After Effects, DaVinci Resolve, Office
 
-    elif query.data == "send_project":
-        await query.message.reply_text("این پروژه‌های من است: https://example.com/projects")
+Developer of the mobile game "Chaos of Words" on Myket
+Member of Iran's national water polo team
+""",
+        'ask_name': "Please enter your full name ✍️",
+        'ask_job': "Please describe your job or business ✍️",
+        'ask_phone': "Please send your phone number 📱",
+        'ask_email': "Please enter your email address 📧",
+        'thanks': "✅ Your information has been recorded. Thank you 🙏",
+        'cancel': "Cancelled."
+    },
+    'ar': {
+        'intro': """
+أنا دانيال فتح‌اللهي؛ مبرمج، مصمم ومطور ألعاب ذو خبرة في Unity والويب وبرامج التصميم. شغوف بالتكنولوجيا والرياضة والابتكار.
 
-def run_bot():
-    app_telegram = ApplicationBuilder().token(TOKEN).build()
-    app_telegram.add_handler(CommandHandler("start", start))
-    app_telegram.add_handler(CallbackQueryHandler(button_handler))
-    print("ربات در حال اجراست...")
-    app_telegram.run_polling()
+التعليم:
+- خريج تخصص الحاسوب من مدرسة نعيم آباد التقنية
+- شهادتان من جامعة هارفارد: CS50x و CS50AI
 
-if __name__ == "__main__":
-    # اجرای وب‌سرور Flask در Thread جدا
-    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=8000)).start()
-    # اجرای ربات تلگرام
-    run_bot()
+المهارات:
+Python، C، C#، HTML & CSS، Unity، WordPress، Photoshop، Premiere، After Effects، DaVinci Resolve، Office
+
+مطور لعبة "فوضى الكلمات" على Myket
+عضو في الفريق الوطني الإيراني لكرة الماء
+""",
+        'ask_name': "يرجى إدخال الاسم الكامل ✍️",
+        'ask_job': "يرجى وصف عملك أو مهنتك ✍️",
+        'ask_phone': "يرجى إرسال رقم الهاتف 📱",
+        'ask_email': "يرجى إدخال البريد الإلكتروني 📧",
+        'thanks': "✅ تم تسجيل معلوماتك. شكرًا 🙏",
+        'cancel': "تم الإلغاء."
+    },
+    'zh': {
+        'intro': """
+我是丹尼尔·法托拉希；一名程序员、设计师和游戏开发者，擅长Unity、网页开发和图形软件。热爱技术、运动和创新。
+
+教育背景：
+- 纳伊姆阿巴德技术学校计算机专业毕业
+- 哈佛大学CS50x和CS50AI证书
+
+技能：
+Python、C、C#、HTML & CSS、Unity、WordPress、Photoshop、Premiere、After Effects、DaVinci Resolve、Office
+
+《混乱之词》手机游戏开发者（Myket平台）
+伊朗国家水球队队员
+""",
+        'ask_name': "请输入您的全名 ✍️",
+        'ask_job': "请输入您的职业信息 ✍️",
+        'ask_phone': "请发送您的电话号码 📱",
+        'ask_email': "请输入您的电子邮件地址 📧",
+        'thanks': "✅ 您的信息已记录。谢谢 🙏",
+        'cancel': "已取消。"
+    }
+}
+# ادامه کد مثل ساختار بالا...
