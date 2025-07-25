@@ -8,7 +8,7 @@ from telegram.ext import (
 )
 
 TOKEN = os.environ.get("TOKEN")
-ADMIN_CHAT_ID = 6441736006  # آیدی عددی شما
+ADMIN_CHAT_ID = -1002848835602  # آیدی عددی شما
 
 app = Flask(__name__)
 
